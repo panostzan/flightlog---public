@@ -1,0 +1,13 @@
+{
+  "manifest_version":3,
+  "name":"Flightlog local sensor",
+  "version":"0.1.1",
+  "description":"Local browsing observations. Record the trail. Don't invent the story.",
+  "incognito":"not_allowed",
+  "permissions":["tabs","webNavigation","storage","alarms"],
+  "host_permissions":["http://127.0.0.1/*","https://chatgpt.com/*","https://chat.openai.com/*"],
+  "content_scripts":[{"matches":["https://chatgpt.com/*","https://chat.openai.com/*"],"js":["chatgpt.js"],"run_at":"document_idle"}],
+  "background":{"service_worker":"worker.js","type":"module"},
+  "options_page":"options.html",
+  "action":{"default_popup":"options.html","default_title":"Flightlog capture status"}
+}

@@ -1,0 +1,5 @@
+const input=(id:string)=>document.getElementById(id) as HTMLInputElement;
+const result=document.getElementById('result')!;
+async function load(){const data=await chrome.runtime.sendMessage({type:'get'});input('token').value=data.config.token;for(const key of ['paused','titles','paths','searches'])input(key).checked=data.config[key];input('excludedHosts').value=data.config.excludedHosts.join('\n');document.getElementById('health')!.textContent=`${data.health?data.health.state:'No status yet'} · ${data.build??'worker version unknown'}`;}
+document.getElementById('save')!.onclick=async()=>{try{const response=await chrome.runtime.sendMessage({type:'save',config:{token:input('token').value,paused:input('paused').checked,titles:input('titles').checked,paths:input('paths').checked,searches:input('searches').checked,excludedHosts:input('excludedHosts').value.split('\n').map(s=>s.trim().toLowerCase()).filter(Boolean)}});result.textContent=response.error??'Saved';await load();}catch{result.textContent='Could not save. Check the extension worker status.';}};
+load().catch(()=>{result.textContent='Worker unavailable. Reload the extension.';});

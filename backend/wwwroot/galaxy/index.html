@@ -1,0 +1,19 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Flightlog Â· Galaxy</title><link rel="stylesheet" href="galaxy.css"></head>
+<body>
+<canvas id="space" aria-hidden="true"></canvas>
+<header><a class="brand" href="./">FLIGHTLOG</a><div class="top-controls"><span id="sync" role="status">LOCAL · CONNECTING</span><button id="reload" title="Refresh saved observations">↻</button><button id="disconnect">EJECT</button><button id="evidence-toggle" aria-expanded="false" aria-controls="inspector">INSPECT</button></div></header>
+<main id="universe" aria-label="Galaxy nodes"><div id="nodes"></div></main>
+<div id="message" role="status">Reading the local skyâ€¦</div>
+<section id="connect" hidden aria-labelledby="connect-title"><h2 id="connect-title">Open your Flightlog</h2><p>Connect securely through the app on this computer.</p><p id="connection-error" role="alert"></p><a class="launch-app" href="flightlog://open">Open Flightlog â†—</a><p>Your browser may ask to open Flightlog. Your connected Galaxy will open in your default browser.</p><details><summary>If the app doesnâ€™t open</summary><p>Double-click <strong>Flightlog.cmd</strong> in your Flightlog folder. It connects automatically.</p></details></section>
+<div class="map-controls"><button id="back" disabled aria-label="Emerge to parent level">↑</button><button id="reset" aria-label="Reset pan and zoom">âŠ™</button><button id="zoom-out" aria-label="Zoom out">âˆ’</button><button id="zoom-in" aria-label="Zoom in">+</button><span id="pages"></span></div>
+<aside id="hud" aria-label="Selected world">
+<div class="hud-top"><nav id="breadcrumbs" aria-label="Galaxy breadcrumb"></nav><span class="hud-state" id="hud-state">OBSERVATORY</span></div>
+<div class="hud-summary"><div><span class="eyebrow" id="node-kind">LOCAL RECORD</span><h1 id="title">Galaxy</h1><p id="stats">Your observations, arranged in space.</p><p id="story" class="story"></p></div><span class="hint">SCROLL TO ZOOM Â· CLICK TO ENTER<br>DRAG TO PAN Â· ESC TO EMERGE</span></div>
+<div class="trail-line"><span class="eyebrow">EXPLORATION TRAIL</span><div id="trail"></div><button id="next-trail" hidden aria-label="Show another recorded trail">Next trail â†’</button></div>
+<section id="inspector" hidden><div class="inspector-context"><h2>Inspection</h2><p id="dates"></p><div id="activity" aria-label="Navigation callbacks across the selected period"></div><p class="fine">Measured foreground, captured prompts, searches, and semantic provenance for this world.</p><div id="relations"></div></div><div class="evidence-list"><h2>Recorded observations</h2><p id="evidence-note"></p><ol id="evidence-items"></ol><button id="more-evidence" hidden>Show more records</button></div></section>
+</aside>
+<script src="app.js" type="module"></script>
+</body></html>
+

@@ -1,0 +1,46 @@
+# Private activity data and user-generated copies
+/data/
+/logs/
+/exports/
+/backups/
+/private/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+*.bak
+
+# Local configuration, credentials, and extension keys
+.env
+.env.*
+!.env.example
+*.local.json
+capture-settings-history.json
+*.pem
+*.crx
+
+# .NET and extension build output
+.tools/
+.test-data/
+**/bin/
+**/obj/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.cache/
+
+# Personal IDE and OS files
+.vs/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.tmp
+*.swp
+*~

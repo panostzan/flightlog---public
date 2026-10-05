@@ -1,0 +1,56 @@
+# ChatGPT evidence source: pre-implementation review
+
+Status: storage and semantic-input foundation implemented. Live capture is now enabled as `chatgpt-dom-v1` after validation against a real DOM sample; official export parsing remains disabled pending a sample. Existing telemetry rows, collectors and Galaxy visual behavior are unchanged.
+
+## Implemented foundation
+
+`backend/Storage/ChatGptStore.cs` creates three additive tables in the existing database: `chatgpt_prompts` (canonical message identity, role and immutable body), `chatgpt_receipts` (immutable per-origin evidence, nullable original/observed timestamps, parent/order/title metadata and import membership), and `chatgpt_imports` (parser version, manifest hash and import time). This component owns these tables without changing the telemetry schema or its database version. Foreign keys and transactions protect memberships. Nullable timestamps stay null; there are no fabricated sensor session clocks. Titles are metadata only.
+
+Persistent identity hashes use exact conversation plus message IDs when both are known. Without both, identity uses the source plus the adapter/parser's persistent evidence UUID. Identical text is never sufficient. Cross-source matches retain separate receipts, including different observation/original timestamps. Conflicting bodies or roles reject the whole write. Reusing a receipt or import ID with changed data also rejects the write. A future parser must generate deterministic evidence/import IDs; the foundation does not infer identity from an unknown export format. Imports with different membership IDs can share the same canonical messages.
+
+`RecordLive` is now called only through the narrow `chatgpt-dom-v1` adapter. `Import` accepts an already-normalized `ChatGptImport`, not an OpenAI export. It atomically validates at most 1,000 records, with a 128 KiB UTF-8 body limit per message; oversized bodies are rejected rather than truncated. Future large-export orchestration must explicitly handle this bound. `IChatGptExportParser` is the parser boundary. Its production implementation always reports `chatgpt_export_sample_required`; `ChatGptTests` provides a clearly named, test-only normalized fixture parser. It makes no OpenAI compatibility claim.
+
+Deleting an import removes its receipts and inventory entry, then deletes canonical messages only if no receipt remains. Other imports and live receipts survive. Repeated deletion is harmless. Original exports are never opened for writing. This is logical database deletion, not a claim of forensic erasure from SQLite WAL, backups or the user's export file.
+
+Authenticated loopback-only API routes under the existing Host/Origin/token middleware. Enrollment accepts a replacement `chrome-extension://` origin when authenticated by the local bearer token, so removing/reloading an unpacked extension cannot strand capture; old telemetry records remain immutable:
+
+- `GET /api/v1/chatgpt/status`: storage health and explicit disabled/unsupported producer states.
+- `GET /api/v1/chatgpt/evidence?after=...`: user-only canonical evidence with full provenance, up to 200 messages and a next cursor. Assistant records are supported internally but excluded here.
+- `GET /api/v1/chatgpt/imports?after=...`: paginated import metadata, without prompt bodies.
+- `POST /api/v1/chatgpt/imports/remove` with `{"import_id":"UUID"}`: remove a specific import.
+
+The authenticated `POST /api/v1/chatgpt/live` endpoint accepts only the enrolled extension origin and user prompt fields; it is not an export or general event endpoint. Reads of an empty store lazily initialize its tables. General diagnostics contain fixed operation/error codes only, with no body/title/identifier payloads. Prompt records themselves are local sensitive data protected by the existing directory permissions; this adds no encryption or synchronization service.
+
+`extension/src/chatgpt.ts` is matched only on `https://chatgpt.com/*` and `https://chat.openai.com/*`. At document idle it baselines existing `[data-message-author-role="user"][data-message-id]` nodes. A MutationObserver then considers newly inserted matching nodes only, extracts the visible `whitespace-pre-wrap` text, and sends one prompt with the URL conversation ID and DOM message ID. It never reads the composer, assistant nodes, network traffic, cookies, storage or keystrokes. The in-memory set prevents repeated mutations; the database message identity makes retries and reload/history rendering idempotent. UI changes that remove these attributes fail closed. A content-script/runtime error is caught and cannot stop the existing worker capture queue.
+
+`galaxy/chatgpt-evidence.js` converts canonical user evidence into the separate `chatgpt.prompt` semantic-input contract. `buildSemanticGalaxy(..., {historyRange, promptEvidence})` consumes it with the existing local classifier and retains provenance IDs. Prompt evidence can create a topic but always contributes zero milliseconds. One unambiguous original timestamp takes precedence; otherwise an observed timestamp is explicitly marked as such. Conflicting original dates and undated messages remain in the evidence map but are excluded from dated worlds. Callers must supply a history range spanning the evidence. The regular Galaxy loader is deliberately not wired to this empty, future producer yet. No labels, prompt bodies, durations or visual styles change in the running Galaxy.
+
+Checks: backend self-tests exercise persistence, retry/cross-source deduplication, conflicts/rollback, original timing/order, roles, logical deletion, parser refusal, privacy-safe logs and telemetry isolation. `extension/tests/chatgpt-evidence.test.mjs` tests topic discovery, zero duration, provenance, role filtering and uncertain dates. Neither suite uses private user prompts.
+
+## Findings
+
+The extension currently observes browser metadata only; it has no ChatGPT content script or captured DOM fixtures. Its persistent outbox and backend ingestion validate the existing observation envelope. SQLite's observations table has a CHECK constraint that rejects new event kinds. The envelope also requires a monotonic session clock, which an official historical export cannot truthfully supply. Prompt bodies may exceed the current 16 KB observation limit. These require explicit design rather than relabeling prompts as browser navigation.
+
+No authenticated ChatGPT DOM is available through the current tool connection, and no official export sample was supplied. Current submission detection and export-shape compatibility have therefore not been verified. A DOM mutation alone cannot distinguish a fresh submission from loading old history, switching a branch, or re-rendering. A send-button click alone cannot establish successful submission. Do not enable a collector built on either assumption.
+
+## Proposed minimal implementation
+
+Use a dedicated local prompt-evidence table and import-membership table in the existing database, with authenticated loopback endpoints under the existing security middleware. Preserve the existing observations table and collectors. Reuse event IDs, source identity and provenance conventions, but allow an absent monotonic clock for imported history; never manufacture one. Keep semantic evidence loading separate from duration reconstruction.
+
+A replaceable content script would run only on explicitly supported ChatGPT pages, respecting pause, exclusions and incognito restrictions. It must read only a rendered submitted user-message container after a verified submission transition. It must never read the composer, assistant containers, page hydration state, network traffic, cookies or tokens. Initial/history renders are baselined and ignored. UI variants without a validated signal fail closed with bounded, body-free health codes. Timestamp semantics must distinguish observed rendering time from server submission time. Rendered content is not necessarily byte-identical to originally typed text.
+
+Use persistent conversation/message identity for deduplication where exposed in the rendered DOM. Do not deduplicate solely by text: repeating an identical prompt can be intentional. Without stable identity and a distinguishable submission transition, report unsupported rather than claim reliable capture. Isolate the adapter queue/error path so malformed or oversized prompts cannot poison browser-event batches. Bound message size, queue storage and retry work; report skipped observations without logging bodies.
+
+For supplied export JSON, validate an explicitly supported conversation mapping shape, read only user-authored textual message parts, preserve original timestamps and parent/message identity, and retain titles only as metadata. Preserve branch relationships rather than asserting a total chronological order from JSON enumeration. Report unsupported/missing timestamps and multimodal content instead of fabricating text or dates. Numbered filenames are accepted only if their contents match the supported format. Do not assume every export has that shape without a sample.
+
+Import in transactions with deterministic conversation/message keys and memberships for each import. Re-importing the same records is idempotent; conflicting identities with different bodies must be reported, never overwritten. Deleting an import removes its memberships and only records with no remaining import or live provenance. Cross-source deduplication requires matching reliable identities; do not silently equate similar text. Original export files are read-only. No automatic account login or history scraping.
+
+The semantic layer consumes user text as rebuildable evidence. It adds supporting IDs, provenance and discovery signals without adding duration. Existing ChatGPT foreground time remains platform time unless a separately justified bounded allocation exists. Historical imports supply no observed foreground time. Current conservative rules can identify some explicit subjects; multi-topic prompts and references such as "that" remain unresolved unless local context rules can support an interpretation. Do not classify conversation titles or assistant responses as user interests.
+
+## Validation gates
+
+Obtain a harmless current ChatGPT DOM fixture covering before/after submission, reload/history load, edit/resubmit and branch switching, plus a redacted official export sample retaining structural keys. Verify the live signal before deploying permissions or capture. Synthetic fixtures alone prove adapter mechanics, not compatibility with current ChatGPT.
+
+Test no draft capture; one prompt/one observation; persistent deduplication; repeated intentional identical prompts; fail-closed UI drift; no prompt bodies in logs; browser collection survives adapter errors; historical timestamp/branch preservation; assistant exclusion; import idempotency/deletion; semantic traceability with zero invented duration; existing Galaxy checks.
+
+No external AI or dependency is proposed. A local model could improve paraphrase and contextual classification later. An external model could also help, but would expose prompt text outside Flightlog and requires a separate explicit decision; neither can recover unobserved duration.

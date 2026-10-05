@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Flightlog sensor</title><link rel="stylesheet" href="options.css"></head><body>
+<h1>Flightlog sensor</h1><p id="health">Loading status…</p><p>Local capture only. Stopping the backend does not stop browser buffering.</p>
+<label>Local token <input id="token" type="password" autocomplete="off"></label>
+<label><input id="paused" type="checkbox"> Pause browser capture</label>
+<label><input id="titles" type="checkbox"> Record page titles (may contain sensitive text)</label>
+<label><input id="paths" type="checkbox"> Record URL paths (may contain identifiers)</label>
+<label><input id="searches" type="checkbox"> Record supported search URL queries</label>
+<label>Excluded hosts, one per line (includes subdomains)<textarea id="excludedHosts" rows="5"></textarea></label>
+<p>Saving clears pending browser observations and starts a new session. Incognito, local/private addresses, and non-web pages are excluded. All IPv6 literals are excluded in this prototype.</p>
+<button id="save">Save and connect</button><p id="result" role="status"></p><script src="options.js" type="module"></script></body></html>
